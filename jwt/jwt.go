@@ -52,6 +52,9 @@ func WithHMACKey(key []byte) Option {
 		if len(key) == 0 {
 			return errors.New("jwt: HMAC key must not be empty")
 		}
+		// Copy the key so a later mutation of the caller's slice cannot change
+		// the verification secret.
+		key = slices.Clone(key)
 		c.keyfunc = func(*jwt.Token) (any, error) { return key, nil }
 		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods([]string{
 			jwt.SigningMethodHS256.Alg(),

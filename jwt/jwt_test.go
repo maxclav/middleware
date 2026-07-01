@@ -456,3 +456,26 @@ func TestNewContextRoundTrip(t *testing.T) {
 		t.Fatalf("claims = %v, want %v", got, want)
 	}
 }
+
+func TestHMACKeyIsCopied(t *testing.T) {
+	t.Parallel()
+
+	// WithHMACKey must copy the key: mutating the caller's slice after
+	// construction must not change the verification secret. The token is signed
+	// with the original bytes before the mutation, so a middleware that aliased
+	// the caller's slice would reject it with 401.
+	key := []byte("original-secret!")
+	mw := newMiddleware(t, jwt.WithHMACKey(key))
+	token := signHS256(t, gojwt.MapClaims{"sub": "u1"}, key)
+	for i := range key {
+		key[i] = 'x'
+	}
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	rec := serve(t, mw(next), bearerRequest(t, token))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; mutating the caller's key must not affect verification", rec.Code)
+	}
+}

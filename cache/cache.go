@@ -175,7 +175,7 @@ func New(opts ...Option) (middleware.Middleware, error) {
 				s.set(key, entry{
 					status:    cw.status,
 					header:    cloneHeader(cw.Header()),
-					body:      cw.body.Bytes(),
+					body:      bytes.Clone(cw.body.Bytes()),
 					expiresAt: time.Now().Add(cfg.ttl),
 				})
 			}
