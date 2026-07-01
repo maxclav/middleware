@@ -12,6 +12,7 @@ go test -race ./...                                  # full suite
 go test ./cors/...                                   # one package
 go test -run TestPreflightFromAllowedOrigin ./cors/... # one test
 go test -coverprofile=/tmp/c.out ./... && go tool cover -func=/tmp/c.out | tail -1  # coverage
+go test -run Example .                               # runnable end-to-end example (example_test.go)
 
 gofmt -l .
 go vet ./...
@@ -23,7 +24,7 @@ golangci-lint caps repeated findings by default; add `--max-same-issues=0 --max-
 
 ## Architecture
 
-This is a single Go module of HTTP server middleware. The design intent lives in `docs/design.md`; the per-package reference is `docs/middlewares.md`.
+This is a single Go module of HTTP server middleware. It is an importable library with no binary or entrypoint; the only runnable artifact is the `Example` in `example_test.go`. The design intent lives in `docs/design.md`; the per-package reference is `docs/middlewares.md`.
 
 The **root package** (`middleware`) is the shared contract and depends only on the standard library:
 
