@@ -3,6 +3,7 @@ package jwt_test
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -569,5 +570,28 @@ func TestNilAsymmetricKeysRejected(t *testing.T) {
 	}
 	if _, err := jwt.New(jwt.WithECDSAPublicKey(nil)); err == nil {
 		t.Fatal("expected error for nil ECDSA key")
+	}
+	if _, err := jwt.New(jwt.WithEdDSAPublicKey(nil)); err == nil {
+		t.Fatal("expected error for nil EdDSA key")
+	}
+}
+
+func TestEdDSAPublicKeyAcceptsEdDSA(t *testing.T) {
+	t.Parallel()
+
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate Ed25519 key: %v", err)
+	}
+	mw := newMiddleware(t, jwt.WithEdDSAPublicKey(pub))
+
+	ed := gojwt.NewWithClaims(gojwt.SigningMethodEdDSA, gojwt.MapClaims{"sub": "u"})
+	edStr, err := ed.SignedString(priv)
+	if err != nil {
+		t.Fatalf("sign EdDSA: %v", err)
+	}
+	var reached bool
+	if rec := serve(t, mw(okHandler(&reached)), bearerRequest(t, edStr)); rec.Code != http.StatusOK {
+		t.Fatalf("EdDSA token: status = %d, want 200", rec.Code)
 	}
 }

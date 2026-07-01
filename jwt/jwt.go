@@ -8,6 +8,7 @@ package jwt
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"errors"
 	"net/http"
@@ -110,6 +111,25 @@ func WithECDSAPublicKey(key *ecdsa.PublicKey) Option {
 			jwt.SigningMethodES256.Alg(),
 			jwt.SigningMethodES384.Alg(),
 			jwt.SigningMethodES512.Alg(),
+		}))
+		return nil
+	}
+}
+
+// WithEdDSAPublicKey is a convenience option for EdDSA (Ed25519) signed tokens.
+// It configures a keyfunc returning key and restricts the accepted signing
+// method to EdDSA, preventing key-confusion attacks. The key must not be empty.
+func WithEdDSAPublicKey(key ed25519.PublicKey) Option {
+	return func(c *config) error {
+		if len(key) == 0 {
+			return errors.New("jwt: EdDSA public key must not be empty")
+		}
+		// Copy the key so a later mutation of the caller's slice cannot change
+		// the verification key.
+		key = slices.Clone(key)
+		c.keyfunc = func(*jwt.Token) (any, error) { return key, nil }
+		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods([]string{
+			jwt.SigningMethodEdDSA.Alg(),
 		}))
 		return nil
 	}

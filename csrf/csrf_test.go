@@ -257,6 +257,8 @@ func TestCookieAttributes(t *testing.T) {
 		},
 		"insecure cookie and custom path": {
 			opts: []csrf.Option{
+				// A prefix-free name is required once Secure or Path "/" is relaxed.
+				csrf.WithCookieName("csrf_token"),
 				csrf.WithSecureCookie(false),
 				csrf.WithPath("/app"),
 			},
@@ -490,5 +492,28 @@ func TestOptionErrorsAreAggregated(t *testing.T) {
 	// The joined error must still be a non-nil error value.
 	if errors.Is(err, nil) {
 		t.Fatal("joined error unexpectedly matched nil")
+	}
+}
+
+func TestHostPrefixRequiresSecureAndRootPath(t *testing.T) {
+	t.Parallel()
+
+	// The default cookie name uses the "__Host-" prefix, which browsers accept
+	// only with a Secure cookie at Path "/". Relaxing either without renaming the
+	// cookie is a configuration error rather than a silent security downgrade.
+	if _, err := csrf.New(csrf.WithSecureCookie(false)); err == nil {
+		t.Error("__Host- default with an insecure cookie should error")
+	}
+	if _, err := csrf.New(csrf.WithPath("/app")); err == nil {
+		t.Error("__Host- default with a non-root path should error")
+	}
+	if _, err := csrf.New(csrf.WithCookieName("csrf_token"), csrf.WithSecureCookie(false)); err != nil {
+		t.Errorf("a prefix-free name with an insecure cookie should succeed: %v", err)
+	}
+	if _, err := csrf.New(csrf.WithCookieName("__Secure-csrf"), csrf.WithPath("/app")); err != nil {
+		t.Errorf("__Secure- allows a custom path: %v", err)
+	}
+	if _, err := csrf.New(csrf.WithCookieName("__Secure-csrf"), csrf.WithSecureCookie(false)); err == nil {
+		t.Error("__Secure- with an insecure cookie should error")
 	}
 }

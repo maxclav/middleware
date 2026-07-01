@@ -23,7 +23,7 @@ third-party dependency.
 | `pprof` | Serve the `net/http/pprof` endpoints under a prefix. | `WithPrefix` | stdlib |
 | `auth` | Scheme-based authentication with a pluggable verifier. | `New(verify, ...)`, `Basic`, `Bearer`, `APIKey`, `FromContext` | stdlib |
 | `ratelimit` | Token-bucket rate limiting, global or per key. | `WithLimit`, `WithRPS`, `WithBurst`, `WithKeyFunc`, `WithMaxKeys`, `ClientIP` | `golang.org/x/time` |
-| `jwt` | Validate a JWT bearer token and place its claims in the context. | `WithHMACKey`, `WithRSAPublicKey`, `WithECDSAPublicKey`, `WithValidMethods`, `WithExpirationRequired`, `WithIssuer`, `WithAudience`, `FromContext` | `golang-jwt/jwt/v5` |
+| `jwt` | Validate a JWT bearer token and place its claims in the context. | `WithHMACKey`, `WithRSAPublicKey`, `WithECDSAPublicKey`, `WithEdDSAPublicKey`, `WithValidMethods`, `WithExpirationRequired`, `WithIssuer`, `WithAudience`, `FromContext` | `golang-jwt/jwt/v5` |
 | `otelmetrics` | OpenTelemetry HTTP server metrics (request duration, active requests). | `WithMeterProvider` | `go.opentelemetry.io/otel` |
 | `oteltrace` | OpenTelemetry server spans with context propagation. | `WithTracerProvider`, `WithPropagators`, `WithSpanNameFunc` | `go.opentelemetry.io/otel` |
 

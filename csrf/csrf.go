@@ -17,13 +17,18 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/maxclav/middleware"
 )
 
 const (
-	// DefaultCookieName is the default name of the CSRF cookie and form field.
-	DefaultCookieName = "csrf_token"
+	// DefaultCookieName is the default CSRF cookie name. It uses the "__Host-"
+	// prefix, which browsers only accept on a Secure cookie scoped to Path "/"
+	// with no Domain, so a cookie set by another subdomain cannot satisfy the
+	// double-submit check. Serving over plain HTTP requires a name without the
+	// prefix (see [WithCookieName]).
+	DefaultCookieName = "__Host-csrf_token"
 	// DefaultHeaderName is the default request header carrying the CSRF token.
 	DefaultHeaderName = "X-CSRF-Token"
 	// DefaultFieldName is the default form field carrying the CSRF token.
@@ -50,6 +55,11 @@ type Option func(*config) error
 
 // WithCookieName sets the name of the CSRF cookie. It must not be empty.
 // Defaults to [DefaultCookieName].
+//
+// A name with the "__Host-" prefix requires WithSecureCookie(true) and
+// WithPath("/"); a "__Secure-" prefix requires WithSecureCookie(true). Choose a
+// name without a prefix (for example "csrf_token") to serve the cookie over
+// plain HTTP during local development.
 func WithCookieName(name string) Option {
 	return func(c *config) error {
 		if name == "" {
@@ -153,6 +163,9 @@ func New(opts ...Option) (middleware.Middleware, error) {
 			errs = append(errs, err)
 		}
 	}
+	if err := validateCookiePrefix(cfg.cookieName, cfg.secure, cfg.path); err != nil {
+		errs = append(errs, err)
+	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
 	}
@@ -226,6 +239,24 @@ func isSafeMethod(method string) bool {
 	default:
 		return false
 	}
+}
+
+// validateCookiePrefix enforces the RFC 6265bis cookie name prefix rules, which
+// browsers require before granting the prefixes their security guarantees. The
+// middleware never sets a Domain attribute, so only Secure and Path need
+// checking here.
+func validateCookiePrefix(name string, secure bool, path string) error {
+	switch {
+	case strings.HasPrefix(name, "__Host-"):
+		if !secure || path != "/" {
+			return errors.New(`csrf: a "__Host-" cookie name requires WithSecureCookie(true) and WithPath("/")`)
+		}
+	case strings.HasPrefix(name, "__Secure-"):
+		if !secure {
+			return errors.New(`csrf: a "__Secure-" cookie name requires WithSecureCookie(true)`)
+		}
+	}
+	return nil
 }
 
 func generateToken() string {
