@@ -13,6 +13,7 @@ go test ./cors/...                                   # one package
 go test -run TestPreflightFromAllowedOrigin ./cors/... # one test
 go test -coverprofile=/tmp/c.out ./... && go tool cover -func=/tmp/c.out | tail -1  # coverage
 go test -run Example .                               # runnable end-to-end example (example_test.go)
+go test -bench=. -benchmem -run='^$' ./...           # per-request hot-path benchmarks
 
 gofmt -l .
 go vet ./...
