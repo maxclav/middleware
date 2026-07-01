@@ -2,14 +2,20 @@
 //
 // The middleware stores the status, headers and body of cacheable responses and
 // replays them for matching subsequent requests, adding an X-Cache header that
-// reports HIT or MISS. Only safe, public, successful responses are cached: the
-// request method must be one of the configured methods (GET and HEAD by
-// default), the response status must be 200, the body must not exceed the
-// configured limit, and the request must not carry an Authorization header or a
-// Cache-Control: no-store directive.
+// reports HIT or MISS.
 //
-// The store is guarded by a [sync.RWMutex] and evicts entries lazily; there are
-// no background goroutines.
+// To avoid serving one client's response to another, only responses that are
+// safe to share are cached. A request is eligible when its method is one of the
+// configured methods (GET and HEAD by default) and it carries no Authorization
+// header, no Cookie, and no Cache-Control: no-store or no-cache. A response is
+// stored only when its status is 200, its body is within the size limit, it
+// sets no cookie, declares no Vary, and is not marked no-store, no-cache or
+// private by Cache-Control. This suits public content; it is not a
+// general-purpose RFC 9111 cache and does not revalidate.
+//
+// There is no request coalescing: concurrent misses on the same cold key each
+// run the next handler. The store is guarded by a [sync.RWMutex] and evicts
+// entries lazily; there are no background goroutines.
 package cache
 
 import (
@@ -184,23 +190,44 @@ func New(opts ...Option) (middleware.Middleware, error) {
 }
 
 // cacheableRequest reports whether a request may be served from or stored in
-// the cache.
+// the cache. Requests carrying credentials (Authorization) or a Cookie are
+// treated as personalized and are never cached.
 func (c *config) cacheableRequest(r *http.Request) bool {
 	if _, ok := c.methods[r.Method]; !ok {
 		return false
 	}
-	if r.Header.Get("Authorization") != "" {
+	if r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
 		return false
 	}
-	if strings.Contains(strings.ToLower(r.Header.Get("Cache-Control")), "no-store") {
-		return false
-	}
-	return true
+	return !directiveContains(r.Header.Get("Cache-Control"), "no-store", "no-cache")
 }
 
-// cacheableResponse reports whether a captured response may be stored.
+// cacheableResponse reports whether a captured response may be stored. Beyond
+// the status and size checks it refuses responses that are not safe to share
+// between clients: one that sets a cookie, declares a Vary (it depends on
+// request headers this cache does not key on), or is marked non-storable or
+// private by Cache-Control.
 func (c *config) cacheableResponse(cw *captureWriter) bool {
-	return cw.status == http.StatusOK && !cw.tooLarge && cw.body.Len() <= c.maxBodyBytes
+	if cw.status != http.StatusOK || cw.tooLarge || cw.body.Len() > c.maxBodyBytes {
+		return false
+	}
+	h := cw.Header()
+	if len(h.Values("Set-Cookie")) > 0 || h.Get("Vary") != "" {
+		return false
+	}
+	return !directiveContains(h.Get("Cache-Control"), "no-store", "no-cache", "private")
+}
+
+// directiveContains reports whether a Cache-Control header value contains any of
+// the given lower-case directives.
+func directiveContains(cacheControl string, directives ...string) bool {
+	cc := strings.ToLower(cacheControl)
+	for _, d := range directives {
+		if strings.Contains(cc, d) {
+			return true
+		}
+	}
+	return false
 }
 
 // replay writes a stored entry to w, marking it as a cache hit.

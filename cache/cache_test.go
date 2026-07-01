@@ -186,7 +186,9 @@ func TestRequestBypassesCache(t *testing.T) {
 	}{
 		"POST method":            {method: http.MethodPost},
 		"Authorization set":      {method: http.MethodGet, header: map[string]string{"Authorization": "Bearer secret"}},
+		"Cookie set":             {method: http.MethodGet, header: map[string]string{"Cookie": "session=abc"}},
 		"Cache-Control no-store": {method: http.MethodGet, header: map[string]string{"Cache-Control": "no-store"}},
+		"Cache-Control no-cache": {method: http.MethodGet, header: map[string]string{"Cache-Control": "no-cache"}},
 	}
 
 	for name, tc := range tests {
@@ -213,6 +215,48 @@ func TestRequestBypassesCache(t *testing.T) {
 			}
 			if calls != 2 {
 				t.Fatalf("handler called %d times, want 2", calls)
+			}
+		})
+	}
+}
+
+// TestResponseNotCached groups responses that must not be stored because they
+// are not safe to share between clients: a cookie, a Vary, or a Cache-Control
+// directive marking the response private or non-storable.
+func TestResponseNotCached(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]map[string]string{
+		"Set-Cookie":             {"Set-Cookie": "session=abc"},
+		"Vary":                   {"Vary": "Accept-Language"},
+		"Cache-Control private":  {"Cache-Control": "private"},
+		"Cache-Control no-store": {"Cache-Control": "no-store"},
+		"Cache-Control no-cache": {"Cache-Control": "no-cache"},
+	}
+
+	for name, respHeaders := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			mw, _ := cache.New()
+			var calls int32
+			h := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				atomic.AddInt32(&calls, 1)
+				for k, v := range respHeaders {
+					w.Header().Set(k, v)
+				}
+				writeString(t, w, "private")
+			}))
+
+			for range 2 {
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/p", http.NoBody))
+				if rec.Header().Get("X-Cache") == "HIT" {
+					t.Fatalf("%s response must not be cached", name)
+				}
+			}
+			if calls != 2 {
+				t.Fatalf("%s: handler called %d times, want 2 (never cached)", name, calls)
 			}
 		})
 	}
@@ -345,17 +389,31 @@ func TestConcurrentSameKey(t *testing.T) {
 func TestEvictionKeepsUnderCap(t *testing.T) {
 	t.Parallel()
 
-	mw, _ := cache.New(cache.WithMaxEntries(2))
+	const maxEntries = 2
+	var calls int32
+	mw, _ := cache.New(cache.WithMaxEntries(maxEntries))
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&calls, 1)
 		writeString(t, w, "x")
 	}))
 
-	// Populate more distinct keys than the cap allows; must not panic or grow
-	// unbounded. Exact retention is implementation-defined for arbitrary
-	// eviction, so we only assert liveness here.
-	for i := range 10 {
+	const keys = maxEntries + 1 // one more distinct key than the cap allows
+	req := func(i int) {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/k%d", i), http.NoBody))
+	}
+	for i := range keys { // first pass: all miss, store bounded to maxEntries
+		req(i)
+	}
+	for i := range keys { // second pass
+		req(i)
+	}
+
+	// If the store had kept every key it would serve all second-pass requests
+	// from cache (keys total handler calls). Because it is bounded below keys, at
+	// least one second-pass request misses and re-runs the handler.
+	if calls <= keys {
+		t.Fatalf("handler called %d times; store did not evict (cap %d not enforced)", calls, maxEntries)
 	}
 }
 
