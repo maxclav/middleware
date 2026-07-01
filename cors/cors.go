@@ -132,6 +132,12 @@ func WithMaxAge(d time.Duration) Option {
 // with credentials (unless an origin func is set), since the CORS specification
 // does not allow Access-Control-Allow-Origin: * to be paired with
 // Access-Control-Allow-Credentials: true.
+//
+// The zero-configuration default allows every origin without credentials
+// (Access-Control-Allow-Origin: *). Set [WithAllowedOrigins] to an explicit list
+// for any API whose responses should not be readable cross-origin. A permissive
+// [WithAllowOriginFunc] combined with [WithAllowCredentials] can reflect any
+// origin with credentials and must be written with care.
 func New(opts ...Option) (middleware.Middleware, error) {
 	cfg := config{
 		allowedOrigins:   []string{wildcard},

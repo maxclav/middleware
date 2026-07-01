@@ -3,6 +3,7 @@ package requestid_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/maxclav/middleware/requestid"
@@ -77,5 +78,32 @@ func TestCustomGeneratorAndHeader(t *testing.T) {
 func TestInvalidOptionsAreRejected(t *testing.T) {
 	if _, err := requestid.New(requestid.WithHeader(""), requestid.WithGenerator(nil)); err == nil {
 		t.Fatal("expected aggregated error for invalid options")
+	}
+}
+
+func TestMalformedIncomingIDIsRegenerated(t *testing.T) {
+	mw, err := requestid.New() // trusts incoming IDs by default
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	var fromCtx string
+	h := mw(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		fromCtx, _ = requestid.FromContext(r.Context())
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+	req.Header.Set(requestid.HeaderName, "bad\r\nInjected: evil")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	got := rec.Header().Get(requestid.HeaderName)
+	if strings.ContainsAny(got, "\r\n") || strings.ContainsAny(fromCtx, "\r\n") {
+		t.Fatalf("control characters propagated: header=%q ctx=%q", got, fromCtx)
+	}
+	if got == "bad\r\nInjected: evil" {
+		t.Fatal("malformed incoming ID was reused instead of regenerated")
+	}
+	if got == "" {
+		t.Fatal("no ID generated")
 	}
 }

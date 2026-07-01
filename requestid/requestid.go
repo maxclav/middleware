@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/maxclav/middleware"
 )
@@ -86,7 +87,9 @@ func New(opts ...Option) (middleware.Middleware, error) {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var id string
 			if cfg.trust {
-				id = r.Header.Get(cfg.header)
+				if v := r.Header.Get(cfg.header); validID(v) {
+					id = v
+				}
 			}
 			if id == "" {
 				id = cfg.generator()
@@ -114,4 +117,20 @@ func randomID() string {
 	// crypto/rand.Read never returns an error on supported platforms.
 	_, _ = rand.Read(b[:])
 	return hex.EncodeToString(b[:])
+}
+
+// maxIDLen bounds the length of a trusted inbound request ID.
+const maxIDLen = 256
+
+// validID reports whether s is safe to reuse as a request ID: non-empty, within
+// the length bound, and free of control characters. Rejecting control
+// characters stops an attacker-supplied header from injecting newlines into
+// logs or the echoed response header when incoming IDs are trusted.
+func validID(s string) bool {
+	if s == "" || len(s) > maxIDLen {
+		return false
+	}
+	return strings.IndexFunc(s, func(r rune) bool {
+		return r < 0x20 || r == 0x7f
+	}) < 0
 }

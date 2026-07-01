@@ -2,6 +2,10 @@ package jwt_test
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -477,5 +481,93 @@ func TestHMACKeyIsCopied(t *testing.T) {
 	rec := serve(t, mw(next), bearerRequest(t, token))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; mutating the caller's key must not affect verification", rec.Code)
+	}
+}
+
+func TestRSAPublicKeyPinsAlgorithms(t *testing.T) {
+	t.Parallel()
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+	mw := newMiddleware(t, jwt.WithRSAPublicKey(&priv.PublicKey))
+
+	// A genuine RS256 token verifies.
+	rs := gojwt.NewWithClaims(gojwt.SigningMethodRS256, gojwt.MapClaims{"sub": "u"})
+	rsStr, err := rs.SignedString(priv)
+	if err != nil {
+		t.Fatalf("sign RS256: %v", err)
+	}
+	var reached bool
+	if rec := serve(t, mw(okHandler(&reached)), bearerRequest(t, rsStr)); rec.Code != http.StatusOK {
+		t.Fatalf("RS256 token: status = %d, want 200", rec.Code)
+	}
+
+	// An HS256 token is rejected regardless of the secret: HS256 is outside the
+	// pinned RSA family, which blocks algorithm-confusion attacks.
+	hs := signHS256(t, gojwt.MapClaims{"sub": "u"}, []byte("public-key-as-hmac-secret"))
+	reached = false
+	rec := serve(t, mw(okHandler(&reached)), bearerRequest(t, hs))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("HS256 confusion token: status = %d, want 401", rec.Code)
+	}
+	if reached {
+		t.Fatal("handler reached with an algorithm-confusion token")
+	}
+}
+
+func TestECDSAPublicKeyAcceptsES256(t *testing.T) {
+	t.Parallel()
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate ECDSA key: %v", err)
+	}
+	mw := newMiddleware(t, jwt.WithECDSAPublicKey(&priv.PublicKey))
+
+	es := gojwt.NewWithClaims(gojwt.SigningMethodES256, gojwt.MapClaims{"sub": "u"})
+	esStr, err := es.SignedString(priv)
+	if err != nil {
+		t.Fatalf("sign ES256: %v", err)
+	}
+	var reached bool
+	if rec := serve(t, mw(okHandler(&reached)), bearerRequest(t, esStr)); rec.Code != http.StatusOK {
+		t.Fatalf("ES256 token: status = %d, want 200", rec.Code)
+	}
+}
+
+func TestExpirationRequired(t *testing.T) {
+	t.Parallel()
+
+	noExp := signHS256(t, gojwt.MapClaims{"sub": "u"}, hmacKey)
+
+	// Without the option a token lacking exp is accepted.
+	var reached bool
+	base := newMiddleware(t, jwt.WithHMACKey(hmacKey))
+	if rec := serve(t, base(okHandler(&reached)), bearerRequest(t, noExp)); rec.Code != http.StatusOK {
+		t.Fatalf("no-exp token without the option: status = %d, want 200", rec.Code)
+	}
+
+	// With the option the same token is rejected.
+	strict := newMiddleware(t, jwt.WithHMACKey(hmacKey), jwt.WithExpirationRequired())
+	reached = false
+	rec := serve(t, strict(okHandler(&reached)), bearerRequest(t, noExp))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("no-exp token with WithExpirationRequired: status = %d, want 401", rec.Code)
+	}
+	if reached {
+		t.Fatal("handler reached with an expiration-less token")
+	}
+}
+
+func TestNilAsymmetricKeysRejected(t *testing.T) {
+	t.Parallel()
+
+	if _, err := jwt.New(jwt.WithRSAPublicKey(nil)); err == nil {
+		t.Fatal("expected error for nil RSA key")
+	}
+	if _, err := jwt.New(jwt.WithECDSAPublicKey(nil)); err == nil {
+		t.Fatal("expected error for nil ECDSA key")
 	}
 }

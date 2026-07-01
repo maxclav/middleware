@@ -5,6 +5,10 @@
 // running. The readiness endpoint runs the configured checks and reports
 // healthy only when all of them pass, signalling that the service is ready to
 // receive traffic. Requests to any other path fall through to the next handler.
+//
+// A failing readiness response lists each failed check's name and error text,
+// which can reveal internal detail. Expose these endpoints only to trusted
+// networks, or keep check error messages free of sensitive information.
 package healthcheck
 
 import (

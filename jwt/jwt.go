@@ -7,6 +7,8 @@ package jwt
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"errors"
 	"net/http"
 	"slices"
@@ -33,7 +35,13 @@ type config struct {
 type Option func(*config) error
 
 // WithKeyFunc sets the [jwt.Keyfunc] used to supply the verification key for a
-// token. It must not be nil and is required unless [WithHMACKey] is used.
+// token. It must not be nil and is required unless [WithHMACKey],
+// [WithRSAPublicKey] or [WithECDSAPublicKey] is used.
+//
+// When supplying an asymmetric verification key through a raw keyfunc, also call
+// [WithValidMethods] to pin the accepted algorithms. Without that, a token
+// forged with a symmetric algorithm can be verified against the public key, an
+// algorithm-confusion attack. The typed helpers pin the algorithms for you.
 func WithKeyFunc(keyfunc jwt.Keyfunc) Option {
 	return func(c *config) error {
 		if keyfunc == nil {
@@ -60,6 +68,48 @@ func WithHMACKey(key []byte) Option {
 			jwt.SigningMethodHS256.Alg(),
 			jwt.SigningMethodHS384.Alg(),
 			jwt.SigningMethodHS512.Alg(),
+		}))
+		return nil
+	}
+}
+
+// WithRSAPublicKey is a convenience option for RSA-signed tokens. It configures
+// a keyfunc returning key and restricts the accepted signing methods to the RSA
+// family (RS256/384/512 and PS256/384/512). Pinning the algorithms prevents
+// key-confusion attacks, where a token forged with a symmetric algorithm is
+// verified against the public key. The key must not be nil.
+func WithRSAPublicKey(key *rsa.PublicKey) Option {
+	return func(c *config) error {
+		if key == nil {
+			return errors.New("jwt: RSA public key must not be nil")
+		}
+		c.keyfunc = func(*jwt.Token) (any, error) { return key, nil }
+		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods([]string{
+			jwt.SigningMethodRS256.Alg(),
+			jwt.SigningMethodRS384.Alg(),
+			jwt.SigningMethodRS512.Alg(),
+			jwt.SigningMethodPS256.Alg(),
+			jwt.SigningMethodPS384.Alg(),
+			jwt.SigningMethodPS512.Alg(),
+		}))
+		return nil
+	}
+}
+
+// WithECDSAPublicKey is a convenience option for ECDSA-signed tokens. It
+// configures a keyfunc returning key and restricts the accepted signing methods
+// to the ECDSA family (ES256/384/512), preventing key-confusion attacks. The
+// key must not be nil.
+func WithECDSAPublicKey(key *ecdsa.PublicKey) Option {
+	return func(c *config) error {
+		if key == nil {
+			return errors.New("jwt: ECDSA public key must not be nil")
+		}
+		c.keyfunc = func(*jwt.Token) (any, error) { return key, nil }
+		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods([]string{
+			jwt.SigningMethodES256.Alg(),
+			jwt.SigningMethodES384.Alg(),
+			jwt.SigningMethodES512.Alg(),
 		}))
 		return nil
 	}
@@ -98,6 +148,16 @@ func WithAudience(aud string) Option {
 func WithLeeway(leeway time.Duration) Option {
 	return func(c *config) error {
 		c.parserOptions = append(c.parserOptions, jwt.WithLeeway(leeway))
+		return nil
+	}
+}
+
+// WithExpirationRequired rejects tokens that omit the "exp" (expiration) claim.
+// Without it a token that carries no exp never expires. It appends a
+// [jwt.WithExpirationRequired] parser option.
+func WithExpirationRequired() Option {
+	return func(c *config) error {
+		c.parserOptions = append(c.parserOptions, jwt.WithExpirationRequired())
 		return nil
 	}
 }

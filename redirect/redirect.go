@@ -71,6 +71,10 @@ func WithTrustForwardedHeaders(trust bool) Option {
 // from the configured canonical form, preserving the request path and query
 // string. Requests that already match pass through unchanged. If neither a
 // scheme nor a host is configured, no request is ever redirected.
+//
+// When [WithHost] is not set, the redirect target reuses the request's Host
+// header, which a client controls. For internet-facing use set [WithHost] to a
+// fixed canonical host so a forged Host cannot influence the redirect target.
 func New(opts ...Option) (middleware.Middleware, error) {
 	cfg := config{
 		code: http.StatusPermanentRedirect,
