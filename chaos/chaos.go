@@ -25,17 +25,22 @@ type config struct {
 
 	// Abort
 	abortStatus int
+	abortSet    bool
 
 	// Sleep
 	minDelay time.Duration
 	maxDelay time.Duration
+	delaySet bool
 
 	// RandomResponse
-	statuses []int
+	statuses    []int
+	statusesSet bool
 }
 
-// Option configures a chaos middleware. All three constructors share this
-// option type.
+// Option configures a chaos middleware. The three constructors share this
+// option type, but each accepts only the options that apply to it (plus the
+// common [WithProbability] and [WithRandFloat]) and returns an error if given an
+// inapplicable one, such as [WithAbortStatus] passed to [Sleep].
 type Option func(*config) error
 
 // WithProbability sets the probability p, in [0, 1], that the fault is injected
@@ -72,6 +77,7 @@ func WithAbortStatus(code int) Option {
 			return fmt.Errorf("chaos: abort status must be in [400, 599], got %d", code)
 		}
 		c.abortStatus = code
+		c.abortSet = true
 		return nil
 	}
 }
@@ -89,6 +95,7 @@ func WithDelayRange(low, high time.Duration) Option {
 		}
 		c.minDelay = low
 		c.maxDelay = high
+		c.delaySet = true
 		return nil
 	}
 }
@@ -107,6 +114,7 @@ func WithStatuses(statuses ...int) Option {
 			}
 		}
 		c.statuses = slices.Clone(statuses)
+		c.statusesSet = true
 		return nil
 	}
 }
@@ -144,6 +152,9 @@ func Abort(opts ...Option) (middleware.Middleware, error) {
 	if err != nil {
 		return nil, err
 	}
+	if cfg.delaySet || cfg.statusesSet {
+		return nil, errors.New("chaos: Abort accepts only WithProbability, WithRandFloat and WithAbortStatus")
+	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -165,6 +176,9 @@ func Sleep(opts ...Option) (middleware.Middleware, error) {
 	cfg, err := newConfig(opts...)
 	if err != nil {
 		return nil, err
+	}
+	if cfg.abortSet || cfg.statusesSet {
+		return nil, errors.New("chaos: Sleep accepts only WithProbability, WithRandFloat and WithDelayRange")
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -213,6 +227,9 @@ func RandomResponse(opts ...Option) (middleware.Middleware, error) {
 	cfg, err := newConfig(opts...)
 	if err != nil {
 		return nil, err
+	}
+	if cfg.abortSet || cfg.delaySet {
+		return nil, errors.New("chaos: RandomResponse accepts only WithProbability, WithRandFloat and WithStatuses")
 	}
 
 	return func(next http.Handler) http.Handler {

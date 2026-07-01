@@ -483,3 +483,26 @@ func TestRandomResponseNegativeRandFloatDoesNotPanic(t *testing.T) {
 		t.Fatalf("status = %d, want one of %v", rec.Code, statuses)
 	}
 }
+
+func TestInapplicableOptionsRejected(t *testing.T) {
+	t.Parallel()
+
+	// An option that a constructor does not use must be a construction error, not
+	// silently ignored.
+	tests := map[string]func() error{
+		"Abort with delay range":          func() error { _, err := chaos.Abort(chaos.WithDelayRange(0, time.Second)); return err },
+		"Abort with statuses":             func() error { _, err := chaos.Abort(chaos.WithStatuses(500)); return err },
+		"Sleep with abort status":         func() error { _, err := chaos.Sleep(chaos.WithAbortStatus(500)); return err },
+		"Sleep with statuses":             func() error { _, err := chaos.Sleep(chaos.WithStatuses(500)); return err },
+		"RandomResponse with abort":       func() error { _, err := chaos.RandomResponse(chaos.WithAbortStatus(500)); return err },
+		"RandomResponse with delay range": func() error { _, err := chaos.RandomResponse(chaos.WithDelayRange(0, time.Second)); return err },
+	}
+	for name, build := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if err := build(); err == nil {
+				t.Errorf("%s: expected an error for an inapplicable option", name)
+			}
+		})
+	}
+}

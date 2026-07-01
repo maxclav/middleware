@@ -82,7 +82,8 @@ func WithErrorHandler(h middleware.ErrorHandler) Option {
 // rejected with 401 Unauthorized carrying a WWW-Authenticate challenge, rendered
 // by the configured [middleware.ErrorHandler]; the next handler is not called.
 //
-// verify must not be nil.
+// verify must not be nil and must return a non-nil identity on success; a nil
+// identity is treated as an authentication failure.
 func New(verify VerifyFunc, opts ...Option) (middleware.Middleware, error) {
 	cfg := config{
 		realm:           "Restricted",
@@ -107,6 +108,11 @@ func New(verify VerifyFunc, opts ...Option) (middleware.Middleware, error) {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			identity, err := verify(r)
+			if err == nil && identity == nil {
+				// A successful verify must yield a non-nil identity; a nil one is
+				// ambiguous with "not authenticated", so fail closed.
+				err = ErrUnauthorized
+			}
 			if err != nil {
 				w.Header().Set("WWW-Authenticate", challenge)
 				cfg.errorHandler(w, r, http.StatusUnauthorized, err)

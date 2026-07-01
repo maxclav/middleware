@@ -359,3 +359,23 @@ func TestNewContextRoundTrip(t *testing.T) {
 		t.Fatalf("identity = %v, want user-99", got)
 	}
 }
+
+func TestNilIdentityRejected(t *testing.T) {
+	t.Parallel()
+
+	// A verify that succeeds but returns a nil identity must be treated as an
+	// authentication failure, not propagated as an authenticated nil.
+	verify := func(*http.Request) (any, error) { return nil, nil }
+	reached := false
+	mw := newMiddleware(t, verify)
+	h := mw(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { reached = true }))
+
+	rec := serve(t, h, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	if reached {
+		t.Fatal("next handler called with a nil identity")
+	}
+}
