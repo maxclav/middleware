@@ -521,7 +521,7 @@ func TestInvalidOptionsRejected(t *testing.T) {
 // deadlineProbe is a minimal http.ResponseWriter exposing SetWriteDeadline and
 // recording whether its Unwrap was called. The gzip wrapper does not implement
 // SetWriteDeadline, so http.NewResponseController must traverse the wrapper's
-// Unwrap to reach this probe — which is what exercises the wrapper's Unwrap.
+// Unwrap to reach this probe, which is what exercises the wrapper's Unwrap.
 type deadlineProbe struct {
 	http.ResponseWriter // the underlying recorder, as an interface
 	deadlineSet         bool

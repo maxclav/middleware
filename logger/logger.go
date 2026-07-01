@@ -32,8 +32,8 @@ func WithLogger(l *slog.Logger) Option {
 	}
 }
 
-// WithAttrs registers a hook that derives extra attributes from the request —
-// for example a request ID pulled from the context — and appends them to every
+// WithAttrs registers a hook that derives extra attributes from the request,
+// such as a request ID pulled from the context, and appends them to every
 // log record.
 func WithAttrs(fn func(*http.Request) []slog.Attr) Option {
 	return func(c *config) error {

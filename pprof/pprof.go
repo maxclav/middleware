@@ -6,7 +6,7 @@
 // served by the standard profiling handlers; all other requests pass through
 // unchanged to the next handler.
 //
-// Security warning: the pprof endpoints expose sensitive runtime data — memory
+// Security warning: the pprof endpoints expose sensitive runtime data: memory
 // contents, goroutine stacks, command-line arguments and, via the CPU and trace
 // profiles, the ability to consume significant resources. They MUST NOT be
 // reachable by untrusted clients. Protect this middleware behind authentication

@@ -2,7 +2,7 @@
 // (CORS) headers to HTTP responses and answers CORS preflight requests.
 //
 // The middleware inspects the request's Origin header, decides whether the
-// origin is allowed, and — for allowed cross-origin requests — sets the
+// origin is allowed, and for allowed cross-origin requests it sets the
 // appropriate Access-Control-* response headers. Preflight requests (OPTIONS
 // carrying an Access-Control-Request-Method header) are answered directly with
 // 204 No Content and are never forwarded to the wrapped handler. Requests

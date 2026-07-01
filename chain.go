@@ -6,8 +6,8 @@ import "net/http"
 // additional behaviour around the original.
 //
 // It is a type alias for the canonical net/http middleware signature, so any
-// existing func(http.Handler) http.Handler — from the standard library, chi,
-// gorilla, alice or your own code — satisfies it without conversion.
+// existing func(http.Handler) http.Handler value (from the standard library,
+// chi, gorilla, alice or your own code) satisfies it without conversion.
 type Middleware = func(http.Handler) http.Handler
 
 // Chain is an immutable, ordered collection of [Middleware]. The zero value is
@@ -15,7 +15,7 @@ type Middleware = func(http.Handler) http.Handler
 // mutates the receiver, so a Chain is safe to share and to reuse as a template.
 //
 // Middleware executes in the order it was added: the first Middleware is the
-// outermost wrapper — it runs first on the way in and last on the way out.
+// outermost wrapper: it runs first on the way in and last on the way out.
 type Chain struct {
 	middlewares []Middleware
 }

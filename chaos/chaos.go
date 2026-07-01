@@ -1,7 +1,7 @@
 // Package chaos provides fault-injection middleware for testing the resilience
 // of HTTP clients and services.
 //
-// It exposes three constructors — [Abort], [Sleep] and [RandomResponse] — that
+// It exposes three constructors ([Abort], [Sleep] and [RandomResponse]) that
 // share a single [Option] set, since they all decide whether to act using a
 // configurable probability and source of randomness. Injecting a deterministic
 // random function with [WithRandFloat] makes the behaviour reproducible in

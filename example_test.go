@@ -16,8 +16,8 @@ import (
 )
 
 // Example assembles a small production-style stack. Because every constructor
-// returns (Middleware, error), configuration mistakes surface once at startup —
-// aggregated with errors.Join — rather than at request time. The assembled
+// returns (Middleware, error), configuration mistakes surface once at startup,
+// aggregated with errors.Join, rather than at request time. The assembled
 // Chain is immutable and reusable.
 func Example() {
 	rec, e1 := recovery.New()

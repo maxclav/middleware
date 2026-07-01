@@ -1,8 +1,8 @@
 // Package secure provides middleware that sets a baseline of security-related
 // response headers on every request.
 //
-// The zero-configuration constructor [New] applies a sensible default set —
-// X-Content-Type-Options, X-Frame-Options and Referrer-Policy — while leaving
+// The zero-configuration constructor [New] applies a sensible default set
+// (X-Content-Type-Options, X-Frame-Options and Referrer-Policy) while leaving
 // deliberately opt-in policies such as HSTS, Content-Security-Policy and
 // Permissions-Policy off until they are configured with the matching options.
 package secure

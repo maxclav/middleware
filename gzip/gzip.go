@@ -243,8 +243,8 @@ func (w *gzipResponseWriter) shouldCompress() bool {
 	return w.contentTypeAllowed()
 }
 
-// contentTypeAllowed reports whether the response content type — taken from the
-// header or detected from the buffered bytes — is in the configured set.
+// contentTypeAllowed reports whether the response content type, taken from the
+// header or detected from the buffered bytes, is in the configured set.
 func (w *gzipResponseWriter) contentTypeAllowed() bool {
 	ct := w.Header().Get("Content-Type")
 	if ct == "" {
