@@ -26,23 +26,33 @@ type ctxKey struct{}
 type config struct {
 	keyfunc       jwt.Keyfunc
 	parserOptions []jwt.ParserOption
+	methodsPinned bool
 	header        string
 	scheme        string
 	newClaims     func() jwt.Claims
 	errorHandler  middleware.ErrorHandler
 }
 
+// pinMethods restricts the accepted signing algorithms and records that the set
+// has been pinned. New requires this whenever a key is configured, so a raw
+// keyfunc cannot be used without an algorithm allow-list.
+func (c *config) pinMethods(algs ...string) {
+	c.parserOptions = append(c.parserOptions, jwt.WithValidMethods(slices.Clone(algs)))
+	c.methodsPinned = true
+}
+
 // Option configures the jwt middleware.
 type Option func(*config) error
 
 // WithKeyFunc sets the [jwt.Keyfunc] used to supply the verification key for a
-// token. It must not be nil and is required unless [WithHMACKey],
-// [WithRSAPublicKey] or [WithECDSAPublicKey] is used.
+// token. It must not be nil.
 //
-// When supplying an asymmetric verification key through a raw keyfunc, also call
-// [WithValidMethods] to pin the accepted algorithms. Without that, a token
-// forged with a symmetric algorithm can be verified against the public key, an
-// algorithm-confusion attack. The typed helpers pin the algorithms for you.
+// A raw keyfunc does not pin the accepted algorithms, so it must be paired with
+// [WithValidMethods]; New returns an error otherwise. This prevents
+// algorithm-confusion attacks, where a token forged with a symmetric algorithm
+// is verified against an asymmetric public key. Prefer the typed helpers
+// [WithHMACKey], [WithRSAPublicKey], [WithECDSAPublicKey] and
+// [WithEdDSAPublicKey], which pin the algorithms for you.
 func WithKeyFunc(keyfunc jwt.Keyfunc) Option {
 	return func(c *config) error {
 		if keyfunc == nil {
@@ -65,11 +75,11 @@ func WithHMACKey(key []byte) Option {
 		// the verification secret.
 		key = slices.Clone(key)
 		c.keyfunc = func(*jwt.Token) (any, error) { return key, nil }
-		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods([]string{
+		c.pinMethods(
 			jwt.SigningMethodHS256.Alg(),
 			jwt.SigningMethodHS384.Alg(),
 			jwt.SigningMethodHS512.Alg(),
-		}))
+		)
 		return nil
 	}
 }
@@ -85,14 +95,14 @@ func WithRSAPublicKey(key *rsa.PublicKey) Option {
 			return errors.New("jwt: RSA public key must not be nil")
 		}
 		c.keyfunc = func(*jwt.Token) (any, error) { return key, nil }
-		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods([]string{
+		c.pinMethods(
 			jwt.SigningMethodRS256.Alg(),
 			jwt.SigningMethodRS384.Alg(),
 			jwt.SigningMethodRS512.Alg(),
 			jwt.SigningMethodPS256.Alg(),
 			jwt.SigningMethodPS384.Alg(),
 			jwt.SigningMethodPS512.Alg(),
-		}))
+		)
 		return nil
 	}
 }
@@ -107,11 +117,11 @@ func WithECDSAPublicKey(key *ecdsa.PublicKey) Option {
 			return errors.New("jwt: ECDSA public key must not be nil")
 		}
 		c.keyfunc = func(*jwt.Token) (any, error) { return key, nil }
-		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods([]string{
+		c.pinMethods(
 			jwt.SigningMethodES256.Alg(),
 			jwt.SigningMethodES384.Alg(),
 			jwt.SigningMethodES512.Alg(),
-		}))
+		)
 		return nil
 	}
 }
@@ -128,9 +138,7 @@ func WithEdDSAPublicKey(key ed25519.PublicKey) Option {
 		// the verification key.
 		key = slices.Clone(key)
 		c.keyfunc = func(*jwt.Token) (any, error) { return key, nil }
-		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods([]string{
-			jwt.SigningMethodEdDSA.Alg(),
-		}))
+		c.pinMethods(jwt.SigningMethodEdDSA.Alg())
 		return nil
 	}
 }
@@ -140,7 +148,7 @@ func WithEdDSAPublicKey(key ed25519.PublicKey) Option {
 // [jwt.WithValidMethods] parser option.
 func WithValidMethods(methods ...string) Option {
 	return func(c *config) error {
-		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods(slices.Clone(methods)))
+		c.pinMethods(methods...)
 		return nil
 	}
 }
@@ -233,9 +241,16 @@ func WithErrorHandler(h middleware.ErrorHandler) Option {
 	}
 }
 
-// New returns middleware that validates a JWT bearer token on every request. A
-// verification key must be configured with [WithKeyFunc] or [WithHMACKey];
-// otherwise New returns an error.
+// New returns middleware that validates a JWT bearer token on every request.
+//
+// A verification key must be configured with a typed helper ([WithHMACKey],
+// [WithRSAPublicKey], [WithECDSAPublicKey] or [WithEdDSAPublicKey]) or with
+// [WithKeyFunc] paired with [WithValidMethods]; otherwise New returns an error.
+//
+// By default the token's expiry, issuer and audience are not required. For
+// defense in depth add [WithExpirationRequired], [WithIssuer] and [WithAudience]
+// so that expired tokens, and tokens minted for another service that shares the
+// key, are rejected.
 //
 // The token is read from the configured header, its scheme prefix is stripped
 // (case-insensitively), and it is parsed with [jwt.ParseWithClaims]. A missing
@@ -259,7 +274,10 @@ func New(opts ...Option) (middleware.Middleware, error) {
 		return nil, err
 	}
 	if cfg.keyfunc == nil {
-		return nil, errors.New("jwt: a key must be configured with WithKeyFunc or WithHMACKey")
+		return nil, errors.New("jwt: a verification key is required (WithHMACKey, WithRSAPublicKey, WithECDSAPublicKey, WithEdDSAPublicKey, or WithKeyFunc)")
+	}
+	if !cfg.methodsPinned {
+		return nil, errors.New("jwt: WithKeyFunc must be paired with WithValidMethods to pin the accepted algorithms")
 	}
 
 	prefix := cfg.scheme + " "

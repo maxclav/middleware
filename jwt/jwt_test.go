@@ -250,7 +250,7 @@ func TestKeyFuncErrorRejected(t *testing.T) {
 	t.Parallel()
 
 	keyfunc := func(*gojwt.Token) (any, error) { return nil, errors.New("no key for token") }
-	mw := newMiddleware(t, jwt.WithKeyFunc(keyfunc))
+	mw := newMiddleware(t, jwt.WithKeyFunc(keyfunc), jwt.WithValidMethods(gojwt.SigningMethodHS256.Alg()))
 
 	reached := false
 	h := mw(okHandler(&reached))
@@ -263,6 +263,20 @@ func TestKeyFuncErrorRejected(t *testing.T) {
 	}
 	if reached {
 		t.Fatal("next handler was called after keyfunc error")
+	}
+}
+
+func TestKeyFuncRequiresValidMethods(t *testing.T) {
+	t.Parallel()
+
+	// A raw keyfunc with no pinned algorithms is refused at construction: it
+	// would otherwise be open to algorithm-confusion attacks.
+	keyfunc := func(*gojwt.Token) (any, error) { return hmacKey, nil }
+	if _, err := jwt.New(jwt.WithKeyFunc(keyfunc)); err == nil {
+		t.Fatal("expected error: WithKeyFunc without WithValidMethods")
+	}
+	if _, err := jwt.New(jwt.WithKeyFunc(keyfunc), jwt.WithValidMethods(gojwt.SigningMethodHS256.Alg())); err != nil {
+		t.Fatalf("WithKeyFunc + WithValidMethods should succeed: %v", err)
 	}
 }
 
@@ -384,6 +398,29 @@ func TestCustomErrorHandler(t *testing.T) {
 	}
 	if gotErr == nil {
 		t.Fatal("error handler received a nil error")
+	}
+}
+
+func TestErrorHandlerReceivesParserError(t *testing.T) {
+	t.Parallel()
+
+	var gotErr error
+	handler := func(w http.ResponseWriter, _ *http.Request, status int, err error) {
+		gotErr = err
+		w.WriteHeader(status)
+	}
+	mw := newMiddleware(t, jwt.WithHMACKey(hmacKey), jwt.WithErrorHandler(handler))
+	h := mw(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+
+	expired := signHS256(t, gojwt.RegisteredClaims{
+		ExpiresAt: gojwt.NewNumericDate(time.Now().Add(-time.Hour)),
+	}, hmacKey)
+	serve(t, h, bearerRequest(t, expired))
+
+	// The concrete parser error must reach the handler so it can branch on it,
+	// not a generic "unauthorized".
+	if !errors.Is(gotErr, gojwt.ErrTokenExpired) {
+		t.Fatalf("error handler got %v, want a wrapped jwt.ErrTokenExpired", gotErr)
 	}
 }
 
