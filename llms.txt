@@ -1,0 +1,18 @@
+# middleware
+
+> Composable net/http middleware for Go. A small core (a Middleware type alias and an immutable Chain) plus focused middlewares, one per subpackage, so importing the root package costs nothing beyond the standard library.
+
+Module path: `github.com/maxclav/middleware`. Requires Go 1.25 or newer. Scope is server-side HTTP middleware only; gRPC and client-side resilience (retry, circuit breaking) are out of scope. Every middleware is constructed with `New(...Option) (Middleware, error)`; the first middleware in a Chain is the outermost wrapper.
+
+## Docs
+
+- [README](README.md): overview, install, and a minimal example.
+- [Middleware catalog](docs/middlewares.md): every middleware with its options and dependencies.
+- [Design notes](docs/design.md): the core type, Chain semantics, dependency isolation, and how to write your own.
+- [Conventions](CLAUDE.md): architecture and the shape every middleware follows.
+
+## Packages
+
+- `middleware`: the Middleware alias, the immutable Chain, ErrorHandler, and a status/byte-capturing ResponseWriter wrapper.
+- Standard-library middlewares: recovery, requestid, logger, timeout, cors, secure, headers, gzip, healthcheck, redirect, skipif, chaos, cache, csrf, pprof, auth.
+- Third-party-dependency middlewares (isolated in their own subpackages): ratelimit (golang.org/x/time), jwt (golang-jwt/jwt/v5), otelmetrics and oteltrace (OpenTelemetry).

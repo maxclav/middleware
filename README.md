@@ -1,5 +1,10 @@
 # middleware
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/maxclav/middleware.svg)](https://pkg.go.dev/github.com/maxclav/middleware)
+[![Go Report Card](https://goreportcard.com/badge/github.com/maxclav/middleware)](https://goreportcard.com/report/github.com/maxclav/middleware)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/maxclav/middleware)](https://go.dev/)
+[![License](https://img.shields.io/github/license/maxclav/middleware)](LICENSE)
+
 Composable `net/http` middleware for Go. A small core (the `Middleware` type and
 an immutable `Chain`) plus a set of focused middlewares, one per subpackage, so
 importing the root package costs nothing beyond the standard library.
@@ -47,3 +52,11 @@ write your own.
 ```sh
 go test -race ./...
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)
