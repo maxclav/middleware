@@ -89,8 +89,9 @@ func WithContentTypes(contentTypes ...string) Option {
 
 // New returns middleware that compresses qualifying responses with gzip.
 //
-// If the request does not accept gzip, the handler runs with the original
-// writer. Otherwise the writer is wrapped so the compression decision can be
+// If the request does not accept gzip, or is a HEAD request (whose body the
+// server discards), the handler runs with the original writer. Otherwise the
+// writer is wrapped so the compression decision can be
 // deferred until the body is written: the response is compressed only when its
 // status is compressible, its content type is configured, no Content-Encoding
 // is already set, and the body reaches the configured minimum size.
@@ -124,7 +125,10 @@ func New(opts ...Option) (middleware.Middleware, error) {
 			// must key on it.
 			w.Header().Add("Vary", "Accept-Encoding")
 
-			if !acceptsGzip(r) {
+			// HEAD responses carry no body (the server discards it), so
+			// compressing would only emit a bogus Content-Encoding on an
+			// empty body. Treat HEAD like a client that does not accept gzip.
+			if !acceptsGzip(r) || r.Method == http.MethodHead {
 				next.ServeHTTP(w, r)
 				return
 			}

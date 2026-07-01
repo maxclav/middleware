@@ -1,5 +1,12 @@
 // Package timeout provides middleware that enforces a per-request time limit by
 // wrapping the standard library's [http.TimeoutHandler].
+//
+// Note: because it builds on [http.TimeoutHandler], the middleware buffers the
+// entire response in memory and does not support response streaming/flushing
+// (the wrapped [http.ResponseWriter] does not implement [http.Flusher]) or
+// connection hijacking (it does not implement [http.Hijacker]). It is therefore
+// unsuitable in front of Server-Sent Events, chunked streaming, or WebSocket
+// upgrade endpoints.
 package timeout
 
 import (
@@ -44,6 +51,11 @@ func WithMessage(msg string) Option {
 // [http.TimeoutHandler], which cancels the request context and writes a 503
 // Service Unavailable response with the configured message when the deadline is
 // exceeded. WithTimeout is required.
+//
+// Note: because it wraps [http.TimeoutHandler], the returned middleware buffers
+// the entire response and does not support response streaming/flushing or
+// connection hijacking, so do not place it in front of Server-Sent Events,
+// chunked streaming, or WebSocket upgrade endpoints.
 func New(opts ...Option) (middleware.Middleware, error) {
 	cfg := config{
 		message: "request timed out",

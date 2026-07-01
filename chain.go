@@ -54,7 +54,8 @@ func (c Chain) Then(h http.Handler) http.Handler {
 	return h
 }
 
-// ThenFunc is like [Chain.Then] but accepts an [http.HandlerFunc].
+// ThenFunc is like [Chain.Then] but accepts an [http.HandlerFunc]. If fn is nil,
+// it behaves like [Chain.Then](nil) and falls back to [http.DefaultServeMux].
 func (c Chain) ThenFunc(fn http.HandlerFunc) http.Handler {
 	if fn == nil {
 		return c.Then(nil)

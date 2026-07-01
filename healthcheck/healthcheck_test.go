@@ -148,6 +148,32 @@ func TestReadinessFailingCheck(t *testing.T) {
 	}
 }
 
+func TestHealthResponsesAreUncacheable(t *testing.T) {
+	t.Parallel()
+
+	// Liveness 200 must not be cached by intermediaries.
+	rec := serve(t, http.MethodGet, "/healthz")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("liveness status = %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("liveness Cache-Control = %q, want %q", got, "no-store")
+	}
+
+	// Readiness 503 must not be cached either.
+	rec = serve(t, http.MethodGet, "/readyz",
+		healthcheck.WithReadinessCheck("db", func(context.Context) error {
+			return errors.New("connection refused")
+		}),
+	)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("readiness status = %d, want 503", rec.Code)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("readiness Cache-Control = %q, want %q", got, "no-store")
+	}
+}
+
 func TestReadinessCheckReceivesRequestContext(t *testing.T) {
 	t.Parallel()
 

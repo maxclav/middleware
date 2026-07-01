@@ -113,6 +113,11 @@ func TestHSTS(t *testing.T) {
 			mutate: func(r *http.Request) { r.TLS = &tls.ConnectionState{} },
 			want:   "",
 		},
+		"one-second max-age over TLS": {
+			opts:   []secure.Option{secure.WithHSTS(time.Second, false, false)},
+			mutate: func(r *http.Request) { r.TLS = &tls.ConnectionState{} },
+			want:   "max-age=1",
+		},
 	}
 
 	for name, tc := range tests {
@@ -168,6 +173,16 @@ func TestNegativeHSTSMaxAgeRejected(t *testing.T) {
 
 	if _, err := secure.New(secure.WithHSTS(-time.Second, false, false)); err == nil {
 		t.Fatal("expected error for negative HSTS max-age")
+	}
+}
+
+// TestSubSecondHSTSMaxAgeRejected guards against a positive max-age below one
+// second: it would truncate to max-age=0 and silently disable HSTS.
+func TestSubSecondHSTSMaxAgeRejected(t *testing.T) {
+	t.Parallel()
+
+	if _, err := secure.New(secure.WithHSTS(500*time.Millisecond, false, false)); err == nil {
+		t.Fatal("expected error for sub-second HSTS max-age")
 	}
 }
 

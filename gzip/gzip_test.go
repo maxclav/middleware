@@ -157,6 +157,30 @@ func TestNoGzipWhenNotAccepted(t *testing.T) {
 	}
 }
 
+// TestHeadNotCompressed verifies that a HEAD request, whose body the server
+// discards, is passed through uncompressed even when it advertises gzip and the
+// handler writes a large compressible body. The Vary header must still be set,
+// since the corresponding GET response varies on Accept-Encoding.
+func TestHeadNotCompressed(t *testing.T) {
+	t.Parallel()
+
+	body := largeJSON()
+	mw, _ := gzip.New()
+	h := mw(jsonHandler(body))
+
+	req := httptest.NewRequest(http.MethodHead, "/", http.NoBody)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding = %q, want empty for HEAD", got)
+	}
+	if got := rec.Header().Get("Vary"); !strings.Contains(got, "Accept-Encoding") {
+		t.Fatalf("Vary = %q, want to contain Accept-Encoding for HEAD", got)
+	}
+}
+
 func TestSmallBodyNotCompressed(t *testing.T) {
 	t.Parallel()
 

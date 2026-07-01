@@ -109,12 +109,18 @@ func TestRedirect(t *testing.T) {
 			wantStatus: http.StatusOK,
 		},
 		{
-			// No scheme or host configured => nothing is ever canonicalized.
-			name:       "no canonical config never redirects",
-			opts:       nil,
-			target:     "http://example.com/foo",
-			wantHit:    true,
-			wantStatus: http.StatusOK,
+			// A bogus X-Forwarded-Proto is ignored even when trusted, falling
+			// back to the TLS-derived scheme ("http" here), so the request is
+			// redirected to https rather than the hostile value.
+			name: "bogus forwarded proto ignored, uses tls scheme",
+			opts: []redirect.Option{
+				redirect.WithScheme("https"),
+				redirect.WithTrustForwardedHeaders(true),
+			},
+			target:       "http://example.com/",
+			forwarded:    "javascript",
+			wantStatus:   http.StatusPermanentRedirect,
+			wantLocation: "https://example.com/",
 		},
 	}
 
@@ -175,7 +181,11 @@ func TestOptionValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := redirect.New(tt.opt)
+			// Pair the option under test with a valid WithScheme so the
+			// required-option gate in New never fires: this test isolates each
+			// option's own validation. The scheme cases exercise WithScheme
+			// directly, so a second one is harmless.
+			_, err := redirect.New(redirect.WithScheme("https"), tt.opt)
 			if tt.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -192,5 +202,23 @@ func TestMultipleInvalidOptionsJoined(t *testing.T) {
 	// Several invalid options are joined into a single error.
 	if _, err := redirect.New(redirect.WithScheme("ftp"), redirect.WithHost("")); err == nil {
 		t.Fatal("expected joined error for multiple invalid options")
+	}
+}
+
+func TestSchemeOrHostRequired(t *testing.T) {
+	t.Parallel()
+
+	// Without WithScheme or WithHost there is nothing to canonicalize, so New
+	// must reject the configuration instead of building a silent no-op.
+	if _, err := redirect.New(); err == nil {
+		t.Fatal("expected error when neither WithScheme nor WithHost is set")
+	}
+
+	// Configuring only a scheme (or only a host) is enough to succeed.
+	if _, err := redirect.New(redirect.WithScheme("https")); err != nil {
+		t.Fatalf("WithScheme only: unexpected error: %v", err)
+	}
+	if _, err := redirect.New(redirect.WithHost("example.com")); err != nil {
+		t.Fatalf("WithHost only: unexpected error: %v", err)
 	}
 }

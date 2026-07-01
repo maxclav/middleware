@@ -125,12 +125,14 @@ func (c *config) serveReadiness(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusServiceUnavailable)
 	_, _ = io.WriteString(w, strings.Join(failures, "\n")+"\n")
 }
 
 func writeOK(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.WriteString(w, "ok")
 }

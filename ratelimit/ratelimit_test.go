@@ -1,6 +1,7 @@
 package ratelimit_test
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -250,9 +251,13 @@ func TestCustomErrorHandler(t *testing.T) {
 	t.Parallel()
 
 	const body = "slow down"
-	var gotStatus int
-	handler := func(w http.ResponseWriter, _ *http.Request, status int, _ error) {
+	var (
+		gotStatus int
+		gotErr    error
+	)
+	handler := func(w http.ResponseWriter, _ *http.Request, status int, err error) {
 		gotStatus = status
+		gotErr = err
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(body))
 	}
@@ -276,6 +281,14 @@ func TestCustomErrorHandler(t *testing.T) {
 	}
 	if gotStatus != http.StatusTooManyRequests {
 		t.Fatalf("handler status = %d, want 429", gotStatus)
+	}
+	// The handler receives a non-nil error identifying the rejection, so a
+	// shared handler that logs err.Error() does not nil-panic.
+	if gotErr == nil {
+		t.Fatal("handler err = nil, want non-nil")
+	}
+	if !errors.Is(gotErr, ratelimit.ErrRateLimited) {
+		t.Fatalf("handler err = %v, want ErrRateLimited", gotErr)
 	}
 	if rec.Body.String() != body {
 		t.Fatalf("body = %q, want %q", rec.Body.String(), body)

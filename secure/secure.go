@@ -37,11 +37,17 @@ type Option func(*config) error
 // WithHSTS enables the Strict-Transport-Security header with the given max-age
 // and flags. HSTS is emitted only when the request is served over TLS (or, when
 // [WithTrustForwardedProto] is enabled, when X-Forwarded-Proto is "https").
-// A non-positive maxAge leaves HSTS disabled, which is the default.
+// A zero maxAge leaves HSTS disabled, which is the default. A positive maxAge
+// must be at least one second, since the header is emitted in whole seconds.
 func WithHSTS(maxAge time.Duration, includeSubdomains, preload bool) Option {
 	return func(c *config) error {
 		if maxAge < 0 {
 			return errors.New("secure: HSTS max-age must not be negative")
+		}
+		if maxAge > 0 && maxAge < time.Second {
+			// A positive sub-second max-age truncates to max-age=0, which
+			// silently disables HSTS; reject it rather than mislead.
+			return errors.New("secure: HSTS max-age must be zero or at least one second")
 		}
 		c.hstsMaxAge = maxAge
 		c.hstsIncludeSubdomains = includeSubdomains

@@ -69,8 +69,9 @@ func WithTrustForwardedHeaders(trust bool) Option {
 
 // New returns middleware that redirects requests whose scheme or host differ
 // from the configured canonical form, preserving the request path and query
-// string. Requests that already match pass through unchanged. If neither a
-// scheme nor a host is configured, no request is ever redirected.
+// string. Requests that already match pass through unchanged. At least one of
+// [WithScheme] or [WithHost] is required; without either there is nothing to
+// canonicalize and New returns an error.
 //
 // When [WithHost] is not set, the redirect target reuses the request's Host
 // header, which a client controls. For internet-facing use set [WithHost] to a
@@ -87,6 +88,9 @@ func New(opts ...Option) (middleware.Middleware, error) {
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
+	}
+	if cfg.scheme == "" && cfg.host == "" {
+		return nil, errors.New("redirect: WithScheme or WithHost is required")
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -115,11 +119,15 @@ func New(opts ...Option) (middleware.Middleware, error) {
 }
 
 // requestScheme derives the request's scheme, preferring X-Forwarded-Proto when
-// forwarded headers are trusted, then TLS state, defaulting to "http".
+// forwarded headers are trusted, then TLS state, defaulting to "http". A
+// forwarded value is only honored when it is exactly "http" or "https"; any
+// other value is ignored so an unvalidated scheme cannot reach the Location
+// header.
 func requestScheme(r *http.Request, trustForwarded bool) string {
 	if trustForwarded {
-		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-			return proto
+		switch r.Header.Get("X-Forwarded-Proto") {
+		case "http", "https":
+			return r.Header.Get("X-Forwarded-Proto")
 		}
 	}
 	if r.TLS != nil {

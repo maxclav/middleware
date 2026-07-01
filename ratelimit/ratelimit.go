@@ -16,6 +16,11 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// ErrRateLimited is passed to the configured [middleware.ErrorHandler] when a
+// request is rejected for exceeding its budget. A shared handler can inspect it
+// with [errors.Is].
+var ErrRateLimited = errors.New("ratelimit: too many requests")
+
 type config struct {
 	limit        rate.Limit
 	burst        int
@@ -62,6 +67,12 @@ func WithBurst(burst int) Option {
 // WithKeyFunc switches the middleware to per-key limiting: each distinct value
 // returned by key gets its own token bucket. It must not be nil. Without it a
 // single global bucket is shared by all requests.
+//
+// Per-key limiting is best-effort. The per-key bucket map is bounded by
+// [WithMaxKeys] and, under a flood of distinct keys, evicts arbitrary entries
+// to stay within that bound; an evicted key comes back with a fresh full
+// bucket, so a client's budget can be reset. All key lookups also serialize on
+// a single mutex, so very high key cardinality or request rates contend on it.
 func WithKeyFunc(key func(*http.Request) string) Option {
 	return func(c *config) error {
 		if key == nil {
@@ -170,7 +181,7 @@ func New(opts ...Option) (middleware.Middleware, error) {
 			}
 			if !limiter.Allow() {
 				w.Header().Set("Retry-After", retryAfter)
-				cfg.errorHandler(w, r, http.StatusTooManyRequests, nil)
+				cfg.errorHandler(w, r, http.StatusTooManyRequests, ErrRateLimited)
 				return
 			}
 			next.ServeHTTP(w, r)
