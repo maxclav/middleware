@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -66,7 +67,7 @@ func WithHMACKey(key []byte) Option {
 // [jwt.WithValidMethods] parser option.
 func WithValidMethods(methods ...string) Option {
 	return func(c *config) error {
-		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods(methods))
+		c.parserOptions = append(c.parserOptions, jwt.WithValidMethods(slices.Clone(methods)))
 		return nil
 	}
 }

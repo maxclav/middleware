@@ -454,3 +454,32 @@ func TestOptionValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestRandomResponseNegativeRandFloatDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	// A misbehaving randFloat returning a value below the documented [0, 1)
+	// range must not produce a negative slice index. randStatus clamps to a
+	// valid index instead of panicking.
+	statuses := []int{http.StatusBadGateway, http.StatusServiceUnavailable}
+	mw, err := chaos.RandomResponse(
+		chaos.WithProbability(1),
+		chaos.WithRandFloat(constRand(-0.5)),
+		chaos.WithStatuses(statuses...),
+	)
+	if err != nil {
+		t.Fatalf("RandomResponse: %v", err)
+	}
+	called := false
+	h := mw(nextHandler(&called))
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, newRequest(t)) // must not panic
+
+	if called {
+		t.Fatal("next handler called despite a triggered random response")
+	}
+	if !slices.Contains(statuses, rec.Code) {
+		t.Fatalf("status = %d, want one of %v", rec.Code, statuses)
+	}
+}

@@ -18,6 +18,7 @@ linters:
     - usestdlibvars # http.MethodGet, http.StatusOK, ...
     - unconvert # redundant type conversions
     - errname # sentinel errors named ErrX / type FooError
+    - forcetypeassert # require checked (comma-ok) type assertions
     - misspell
     - whitespace
     - nolintlint # keep //nolint directives honest

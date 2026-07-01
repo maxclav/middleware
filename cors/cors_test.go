@@ -456,3 +456,23 @@ func TestInvalidOptionsAreAggregated(t *testing.T) {
 		t.Fatal("expected aggregated error for invalid options")
 	}
 }
+
+func TestAllowedOriginsAreCopied(t *testing.T) {
+	t.Parallel()
+
+	// Passing a slice and mutating it afterward must not change the configured
+	// allow-list: the option stores a copy, not the caller's backing array.
+	origins := []string{"https://app.example.com"}
+	mw := newMiddleware(t, cors.WithAllowedOrigins(origins...))
+	origins[0] = "https://evil.example.com"
+
+	called := false
+	h := mw(nextRecorder(&called))
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, actualRequest("https://app.example.com"))
+
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://app.example.com" {
+		t.Fatalf("Allow-Origin = %q, want the original origin; config must not alias the caller's slice", got)
+	}
+}

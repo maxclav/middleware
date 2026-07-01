@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/maxclav/middleware"
@@ -105,7 +106,7 @@ func WithStatuses(statuses ...int) Option {
 				return fmt.Errorf("chaos: status must be in [100, 599], got %d", code)
 			}
 		}
-		c.statuses = statuses
+		c.statuses = slices.Clone(statuses)
 		return nil
 	}
 }
@@ -227,10 +228,10 @@ func RandomResponse(opts ...Option) (middleware.Middleware, error) {
 }
 
 // randStatus picks one of the configured statuses using the injected random
-// source. The index is clamped so that a randFloat result of exactly 1 (outside
-// the documented [0, 1) range) still selects the last status rather than
+// source. The index is clamped into [0, len-1] so that a randFloat result
+// outside the documented [0, 1) range still selects a valid status rather than
 // panicking.
 func (c *config) randStatus() int {
-	i := min(int(c.randFloat()*float64(len(c.statuses))), len(c.statuses)-1)
+	i := min(max(int(c.randFloat()*float64(len(c.statuses))), 0), len(c.statuses)-1)
 	return c.statuses[i]
 }

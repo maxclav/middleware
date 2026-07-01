@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -81,7 +82,7 @@ func WithContentTypes(contentTypes ...string) Option {
 		if len(contentTypes) == 0 {
 			return errors.New("gzip: content types must not be empty")
 		}
-		c.contentTypes = contentTypes
+		c.contentTypes = slices.Clone(contentTypes)
 		return nil
 	}
 }
@@ -219,7 +220,11 @@ func (w *gzipResponseWriter) decide() error {
 		h.Del("Content-Length")
 		w.ResponseWriter.WriteHeader(w.status)
 
-		gz := w.pool.Get().(*gzip.Writer)
+		gz, ok := w.pool.Get().(*gzip.Writer)
+		if !ok {
+			// Unreachable: the pool's New only ever returns *gzip.Writer.
+			gz = gzip.NewWriter(w.ResponseWriter)
+		}
 		gz.Reset(w.ResponseWriter)
 		w.gz = gz
 		_, err := io.Copy(gz, &w.buf)

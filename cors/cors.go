@@ -47,7 +47,7 @@ func WithAllowedOrigins(origins ...string) Option {
 		if len(origins) == 0 {
 			return errors.New("cors: allowed origins must not be empty")
 		}
-		c.allowedOrigins = origins
+		c.allowedOrigins = slices.Clone(origins)
 		return nil
 	}
 }
@@ -75,7 +75,7 @@ func WithAllowedMethods(methods ...string) Option {
 		if len(methods) == 0 {
 			return errors.New("cors: allowed methods must not be empty")
 		}
-		c.allowedMethods = methods
+		c.allowedMethods = slices.Clone(methods)
 		return nil
 	}
 }
@@ -86,7 +86,7 @@ func WithAllowedMethods(methods ...string) Option {
 // instead. Defaults to empty (reflect).
 func WithAllowedHeaders(headers ...string) Option {
 	return func(c *config) error {
-		c.allowedHeaders = headers
+		c.allowedHeaders = slices.Clone(headers)
 		return nil
 	}
 }
@@ -96,7 +96,7 @@ func WithAllowedHeaders(headers ...string) Option {
 // making them readable by the browser. Defaults to none.
 func WithExposedHeaders(headers ...string) Option {
 	return func(c *config) error {
-		c.exposedHeaders = headers
+		c.exposedHeaders = slices.Clone(headers)
 		return nil
 	}
 }
