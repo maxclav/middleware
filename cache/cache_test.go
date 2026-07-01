@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/maxclav/middleware/cache"
@@ -89,32 +90,37 @@ func TestHeadRequestCached(t *testing.T) {
 func TestEntryExpiresAfterTTL(t *testing.T) {
 	t.Parallel()
 
-	mw, _ := cache.New(cache.WithTTL(20 * time.Millisecond))
-	var calls int32
-	h := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&calls, 1)
-		writeString(t, w, "v")
-	}))
+	// synctest gives deterministic time: no wall-clock elapses between the MISS
+	// and the HIT (so the HIT can never race past the TTL), and the expiry is
+	// triggered by advancing synthetic time rather than a real sleep.
+	synctest.Test(t, func(t *testing.T) {
+		mw, _ := cache.New(cache.WithTTL(20 * time.Millisecond))
+		var calls int32
+		h := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			atomic.AddInt32(&calls, 1)
+			writeString(t, w, "v")
+		}))
+		serve := func() *httptest.ResponseRecorder {
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
+			return rec
+		}
 
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
+		serve() // MISS: stores the entry with a 20ms TTL
+		if got := serve().Header().Get("X-Cache"); got != "HIT" {
+			t.Fatalf("before expiry: X-Cache = %q, want HIT", got)
+		}
 
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
-	if rec.Header().Get("X-Cache") != "HIT" {
-		t.Fatal("expected HIT before expiry")
-	}
+		time.Sleep(21 * time.Millisecond) // advance synthetic time past the TTL
+		synctest.Wait()
 
-	time.Sleep(40 * time.Millisecond)
-
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", http.NoBody))
-	if rec.Header().Get("X-Cache") != "MISS" {
-		t.Fatal("expected MISS after expiry")
-	}
-	if calls != 2 {
-		t.Fatalf("handler called %d times, want 2", calls)
-	}
+		if got := serve().Header().Get("X-Cache"); got != "MISS" {
+			t.Fatalf("after expiry: X-Cache = %q, want MISS", got)
+		}
+		if calls != 2 {
+			t.Fatalf("handler called %d times, want 2", calls)
+		}
+	})
 }
 
 func TestNon200NotCached(t *testing.T) {

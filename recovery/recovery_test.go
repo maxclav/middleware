@@ -18,6 +18,8 @@ func discardLogger() *slog.Logger {
 }
 
 func TestRecoversPanicAndReturns500(t *testing.T) {
+	t.Parallel()
+
 	mw, err := recovery.New(recovery.WithLogger(discardLogger()))
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -35,6 +37,8 @@ func TestRecoversPanicAndReturns500(t *testing.T) {
 }
 
 func TestErrAbortHandlerPropagates(t *testing.T) {
+	t.Parallel()
+
 	mw, _ := recovery.New(recovery.WithLogger(discardLogger()))
 	h := mw(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		panic(http.ErrAbortHandler)
@@ -49,6 +53,8 @@ func TestErrAbortHandlerPropagates(t *testing.T) {
 }
 
 func TestNoPanicPassesThrough(t *testing.T) {
+	t.Parallel()
+
 	mw, _ := recovery.New(recovery.WithLogger(discardLogger()))
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
@@ -64,6 +70,8 @@ func TestNoPanicPassesThrough(t *testing.T) {
 }
 
 func TestPanicIsLoggedWithStack(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
 	mw, _ := recovery.New(recovery.WithLogger(logger))
@@ -83,18 +91,24 @@ func TestPanicIsLoggedWithStack(t *testing.T) {
 }
 
 func TestNilLoggerIsRejected(t *testing.T) {
+	t.Parallel()
+
 	if _, err := recovery.New(recovery.WithLogger(nil)); err == nil {
 		t.Fatal("expected error for nil logger")
 	}
 }
 
 func TestNilErrorHandlerIsRejected(t *testing.T) {
+	t.Parallel()
+
 	if _, err := recovery.New(recovery.WithErrorHandler(nil)); err == nil {
 		t.Fatal("expected error for nil error handler")
 	}
 }
 
 func TestCustomErrorHandlerReceivesPanic(t *testing.T) {
+	t.Parallel()
+
 	var gotStatus int
 	var gotErr error
 	eh := func(w http.ResponseWriter, _ *http.Request, status int, err error) {
@@ -122,6 +136,8 @@ func TestCustomErrorHandlerReceivesPanic(t *testing.T) {
 }
 
 func TestErrorValuedPanicIsPreserved(t *testing.T) {
+	t.Parallel()
+
 	sentinel := errors.New("sentinel failure")
 	var got error
 	eh := func(_ http.ResponseWriter, _ *http.Request, _ int, err error) { got = err }
@@ -136,6 +152,8 @@ func TestErrorValuedPanicIsPreserved(t *testing.T) {
 }
 
 func TestResponseNotOverwrittenAfterWrite(t *testing.T) {
+	t.Parallel()
+
 	mw, _ := recovery.New(recovery.WithLogger(discardLogger()))
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
@@ -152,6 +170,8 @@ func TestResponseNotOverwrittenAfterWrite(t *testing.T) {
 }
 
 func TestStackTraceCanBeDisabled(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	mw, _ := recovery.New(
 		recovery.WithLogger(slog.New(slog.NewTextHandler(&buf, nil))),

@@ -10,6 +10,8 @@ import (
 )
 
 func TestGeneratesIDWhenAbsent(t *testing.T) {
+	t.Parallel()
+
 	mw, err := requestid.New()
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -33,6 +35,8 @@ func TestGeneratesIDWhenAbsent(t *testing.T) {
 }
 
 func TestReusesTrustedIncomingID(t *testing.T) {
+	t.Parallel()
+
 	mw, _ := requestid.New()
 	h := mw(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 
@@ -47,6 +51,8 @@ func TestReusesTrustedIncomingID(t *testing.T) {
 }
 
 func TestRegeneratesWhenIncomingNotTrusted(t *testing.T) {
+	t.Parallel()
+
 	mw, _ := requestid.New(requestid.WithTrustIncoming(false))
 	h := mw(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 
@@ -61,6 +67,8 @@ func TestRegeneratesWhenIncomingNotTrusted(t *testing.T) {
 }
 
 func TestCustomGeneratorAndHeader(t *testing.T) {
+	t.Parallel()
+
 	mw, _ := requestid.New(
 		requestid.WithHeader("X-Trace"),
 		requestid.WithGenerator(func() string { return "fixed" }),
@@ -76,12 +84,16 @@ func TestCustomGeneratorAndHeader(t *testing.T) {
 }
 
 func TestInvalidOptionsAreRejected(t *testing.T) {
+	t.Parallel()
+
 	if _, err := requestid.New(requestid.WithHeader(""), requestid.WithGenerator(nil)); err == nil {
 		t.Fatal("expected aggregated error for invalid options")
 	}
 }
 
 func TestMalformedIncomingIDIsRegenerated(t *testing.T) {
+	t.Parallel()
+
 	mw, err := requestid.New() // trusts incoming IDs by default
 	if err != nil {
 		t.Fatalf("New: %v", err)

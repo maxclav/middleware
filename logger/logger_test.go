@@ -12,6 +12,8 @@ import (
 )
 
 func TestLogsRequestFields(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	l := slog.New(slog.NewJSONHandler(&buf, nil))
 
@@ -48,6 +50,8 @@ func TestLogsRequestFields(t *testing.T) {
 }
 
 func TestLevelReflectsStatus(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	l := slog.New(slog.NewJSONHandler(&buf, nil))
 	mw, _ := logger.New(logger.WithLogger(l))
@@ -65,6 +69,8 @@ func TestLevelReflectsStatus(t *testing.T) {
 }
 
 func TestAttrsHookIsApplied(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	l := slog.New(slog.NewJSONHandler(&buf, nil))
 	mw, _ := logger.New(
@@ -85,6 +91,8 @@ func TestAttrsHookIsApplied(t *testing.T) {
 }
 
 func TestOptionValidationErrors(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]logger.Option{
 		"nil logger":     logger.WithLogger(nil),
 		"nil attrs hook": logger.WithAttrs(nil),
@@ -101,6 +109,8 @@ func TestOptionValidationErrors(t *testing.T) {
 }
 
 func TestClientErrorLogsAtWarn(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	mw, _ := logger.New(logger.WithLogger(slog.New(slog.NewJSONHandler(&buf, nil))))
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -119,6 +129,8 @@ func TestClientErrorLogsAtWarn(t *testing.T) {
 }
 
 func TestCustomLevelFuncAndMessage(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	handler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})
 	mw, _ := logger.New(
@@ -143,6 +155,8 @@ func TestCustomLevelFuncAndMessage(t *testing.T) {
 }
 
 func TestDefaultMessage(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	mw, _ := logger.New(logger.WithLogger(slog.New(slog.NewJSONHandler(&buf, nil))))
 	h := mw(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))

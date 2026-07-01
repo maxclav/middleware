@@ -11,6 +11,8 @@ import (
 )
 
 func TestDefaultErrorHandler(t *testing.T) {
+	t.Parallel()
+
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 
@@ -30,6 +32,8 @@ func TestDefaultErrorHandler(t *testing.T) {
 // TestDefaultErrorHandlerToleratesNilError documents that a nil err is valid:
 // middlewares may reject a request without an underlying error value.
 func TestDefaultErrorHandlerToleratesNilError(t *testing.T) {
+	t.Parallel()
+
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 

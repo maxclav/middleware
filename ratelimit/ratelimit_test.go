@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/maxclav/middleware/ratelimit"
 	"golang.org/x/time/rate"
@@ -27,6 +29,38 @@ func serve(t *testing.T, h http.Handler, remoteAddr string) *httptest.ResponseRe
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
+}
+
+func TestRefillOverTime(t *testing.T) {
+	t.Parallel()
+
+	// synctest makes the token refill deterministic: one token every 100ms with a
+	// burst of 1, so the bucket is empty after the first request and a single
+	// token returns exactly 100ms of synthetic time later.
+	synctest.Test(t, func(t *testing.T) {
+		mw, err := ratelimit.New(
+			ratelimit.WithLimit(rate.Every(100*time.Millisecond)),
+			ratelimit.WithBurst(1),
+		)
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+		h := mw(okHandler())
+
+		if rec := serve(t, h, "1.2.3.4:1000"); rec.Code != http.StatusOK {
+			t.Fatalf("first request: status = %d, want 200", rec.Code)
+		}
+		if rec := serve(t, h, "1.2.3.4:1000"); rec.Code != http.StatusTooManyRequests {
+			t.Fatalf("immediate second request: status = %d, want 429", rec.Code)
+		}
+
+		time.Sleep(100 * time.Millisecond) // one token refills
+		synctest.Wait()
+
+		if rec := serve(t, h, "1.2.3.4:1000"); rec.Code != http.StatusOK {
+			t.Fatalf("after refill: status = %d, want 200", rec.Code)
+		}
+	})
 }
 
 func TestBurstThenRejected(t *testing.T) {

@@ -26,6 +26,8 @@ func serve(h http.Handler) {
 }
 
 func TestChainExecutesInRegistrationOrder(t *testing.T) {
+	t.Parallel()
+
 	var log []string
 	h := middleware.New(tag("a", &log), tag("b", &log), tag("c", &log)).
 		ThenFunc(func(http.ResponseWriter, *http.Request) {
@@ -40,6 +42,8 @@ func TestChainExecutesInRegistrationOrder(t *testing.T) {
 }
 
 func TestAppendDoesNotMutateReceiver(t *testing.T) {
+	t.Parallel()
+
 	var log []string
 	base := middleware.New(tag("a", &log))
 	extended := base.Append(tag("b", &log))
@@ -57,6 +61,8 @@ func TestAppendDoesNotMutateReceiver(t *testing.T) {
 }
 
 func TestExtendConcatenatesChains(t *testing.T) {
+	t.Parallel()
+
 	var log []string
 	first := middleware.New(tag("a", &log), tag("b", &log))
 	second := middleware.New(tag("c", &log))
@@ -69,6 +75,8 @@ func TestExtendConcatenatesChains(t *testing.T) {
 }
 
 func TestZeroChainIsUsable(t *testing.T) {
+	t.Parallel()
+
 	called := false
 	middleware.New().
 		ThenFunc(func(http.ResponseWriter, *http.Request) { called = true }).
@@ -79,6 +87,8 @@ func TestZeroChainIsUsable(t *testing.T) {
 }
 
 func TestThenNilUsesDefaultServeMux(t *testing.T) {
+	t.Parallel()
+
 	// Then(nil) must not panic and must fall back to http.DefaultServeMux.
 	if got := middleware.New().Then(nil); got != http.Handler(http.DefaultServeMux) {
 		t.Fatalf("Then(nil) = %v, want http.DefaultServeMux", got)
@@ -86,6 +96,8 @@ func TestThenNilUsesDefaultServeMux(t *testing.T) {
 }
 
 func TestThenFuncNilUsesDefaultServeMux(t *testing.T) {
+	t.Parallel()
+
 	// ThenFunc(nil) must behave like Then(nil).
 	if got := middleware.New().ThenFunc(nil); got != http.Handler(http.DefaultServeMux) {
 		t.Fatalf("ThenFunc(nil) = %v, want http.DefaultServeMux", got)
@@ -93,6 +105,8 @@ func TestThenFuncNilUsesDefaultServeMux(t *testing.T) {
 }
 
 func TestChainIsReusable(t *testing.T) {
+	t.Parallel()
+
 	// Then must not mutate the receiver, so the same Chain can wrap many handlers.
 	var log []string
 	c := middleware.New(tag("a", &log))

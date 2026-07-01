@@ -9,6 +9,8 @@ import (
 )
 
 func TestWrapResponseWriterRecordsStatusAndBytes(t *testing.T) {
+	t.Parallel()
+
 	rec := httptest.NewRecorder()
 	rw := middleware.WrapResponseWriter(rec)
 
@@ -30,6 +32,8 @@ func TestWrapResponseWriterRecordsStatusAndBytes(t *testing.T) {
 }
 
 func TestWriteDefaultsStatusToOK(t *testing.T) {
+	t.Parallel()
+
 	rw := middleware.WrapResponseWriter(httptest.NewRecorder())
 	if _, err := rw.Write([]byte("x")); err != nil {
 		t.Fatalf("Write: %v", err)
@@ -40,6 +44,8 @@ func TestWriteDefaultsStatusToOK(t *testing.T) {
 }
 
 func TestWriteHeaderIsIdempotent(t *testing.T) {
+	t.Parallel()
+
 	rec := httptest.NewRecorder()
 	rw := middleware.WrapResponseWriter(rec)
 	rw.WriteHeader(http.StatusCreated)
@@ -54,6 +60,8 @@ func TestWriteHeaderIsIdempotent(t *testing.T) {
 }
 
 func TestWrapIsIdempotent(t *testing.T) {
+	t.Parallel()
+
 	rw := middleware.WrapResponseWriter(httptest.NewRecorder())
 	if again := middleware.WrapResponseWriter(rw); again != rw {
 		t.Error("wrapping an already-wrapped ResponseWriter allocated a new one")
@@ -61,6 +69,8 @@ func TestWrapIsIdempotent(t *testing.T) {
 }
 
 func TestUnwrapReturnsUnderlyingWriter(t *testing.T) {
+	t.Parallel()
+
 	rec := httptest.NewRecorder()
 	rw := middleware.WrapResponseWriter(rec)
 	if rw.Unwrap() != http.ResponseWriter(rec) {
