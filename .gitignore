@@ -1,0 +1,15 @@
+# Test binaries and coverage output
+*.test
+*.out
+coverage.*
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Editor / OS cruft
+.DS_Store
+*.swp
+
+# Claude Code session memory (not part of the library)
+.remember/

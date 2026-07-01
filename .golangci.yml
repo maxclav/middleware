@@ -1,0 +1,52 @@
+# Lint gate for the middleware module.
+# Runs the standard set (errcheck, govet, ineffassign, staticcheck, unused)
+# plus a curated selection of high-signal idiom checks drawn from the
+# Go Code Review Comments, Google and Uber style guides.
+version: "2"
+
+run:
+  timeout: 3m
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - revive # exported docs, naming, error strings, context-as-argument
+    - gocritic # idiomatic diagnostics
+    - intrange # for i := 0; i < n; i++  ->  for i := range n
+    - copyloopvar # Go 1.22 loop-var semantics
+    - usestdlibvars # http.MethodGet, http.StatusOK, ...
+    - unconvert # redundant type conversions
+    - errname # sentinel errors named ErrX / type FooError
+    - misspell
+    - whitespace
+    - nolintlint # keep //nolint directives honest
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - ifElseChain
+        - unnamedResult
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+        - name: var-naming
+        - name: error-strings
+        - name: error-return
+        - name: error-naming
+        - name: context-as-argument
+        - name: receiver-naming
+        - name: indent-error-flow
+        - name: unexported-return
+        - name: blank-imports
+        - name: increment-decrement
+        - name: superfluous-else
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
